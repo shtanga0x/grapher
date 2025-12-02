@@ -1,0 +1,67 @@
+# GitHub Actions workflow для деплоя на GitHub Pages
+# Документация: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site#publishing-with-a-custom-github-actions-workflow
+
+name: Deploy to GitHub Pages
+
+on:
+  # Запуск при push в main ветку
+  push:
+    branches: ['main']
+  
+  # Возможность запустить вручную из вкладки Actions
+  workflow_dispatch:
+
+# Разрешения для GITHUB_TOKEN для деплоя на GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Разрешить только один деплой одновременно
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  # Job для сборки
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # URL вашего Cloudflare Worker (установите в Settings -> Secrets and variables -> Actions)
+          VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+  # Job для деплоя
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
