@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   // Base path для GitHub Pages - используйте имя репозитория
   // или '/' если деплоите на кастомный домен
-  base: process.env.GITHUB_ACTIONS ? '/polymarket-grapher/' : '/',
+  base: process.env.GITHUB_ACTIONS ? '/grapher/' : '/',
   server: {
     proxy: {
       '/api/gamma': {
