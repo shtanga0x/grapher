@@ -275,14 +275,65 @@ export function SecondScreen({
     fetchCrypto();
   }, [crypto, timeRange]);
 
+  // Build extended price histories to keep resolved markets tracked
+  // until the longest-running market ends
+  const extendedPriceHistories = useMemo(() => {
+    const betKeys = Array.from(selectedBets.keys());
+    if (betKeys.length === 0) return priceHistories;
+
+    // Find max timestamp across all histories
+    let globalMaxTimestamp = -Infinity;
+    for (const [, history] of priceHistories) {
+      if (history && history.length > 0) {
+        const lastTs = history[history.length - 1].t;
+        if (lastTs > globalMaxTimestamp) {
+          globalMaxTimestamp = lastTs;
+        }
+    }
+    }
+
+    if (globalMaxTimestamp === -Infinity) return priceHistories;
+
+    // Create extended histories
+    const extended = new Map<string, PricePoint[]>();
+    for (const betKey of betKeys) {
+      const history = priceHistories.get(betKey);
+      if (!history || history.length === 0) {
+        extended.set(betKey, history || []);
+        continue;
+      }
+
+      const lastPoint = history[history.length - 1];
+      const lastTs = lastPoint.t;
+      const lastPrice = lastPoint.p;
+
+      // If this market ends before the global max, extend it
+      if (lastTs < globalMaxTimestamp) {
+        // Determine resolution value: 0 if resolved No, 1 if resolved Yes
+        const resolutionPrice = lastPrice >= 0.5 ? 1 : 0;
+
+        // Create extended history with the resolution price at global max timestamp
+        const extendedHistory = [
+          ...history,
+          { t: globalMaxTimestamp, p: resolutionPrice }
+        ];
+        extended.set(betKey, extendedHistory);
+      } else {
+        extended.set(betKey, history);
+      }
+    }
+
+    return extended;
+  }, [selectedBets, priceHistories]);
+
   // Build chart data
   const chartData = useMemo(() => {
     const dataMap = new Map<number, ChartDataPoint>();
     const betKeys = Array.from(selectedBets.keys());
 
-    // Collect all unique timestamps
+    // Collect all unique timestamps from extended histories
     for (const betKey of betKeys) {
-      const history = priceHistories.get(betKey);
+      const history = extendedPriceHistories.get(betKey);
       if (history) {
         for (const point of history) {
           if (!dataMap.has(point.t)) {
@@ -310,7 +361,7 @@ export function SecondScreen({
       let validBetsForSum = 0;
 
       for (const betKey of betKeys) {
-        const history = priceHistories.get(betKey);
+        const history = extendedPriceHistories.get(betKey);
         if (history) {
           const price = findNearestPrice(history, timestamp);
           if (price !== null) {
@@ -336,7 +387,7 @@ export function SecondScreen({
     }
 
     return timestamps.map((t) => dataMap.get(t)!);
-  }, [selectedBets, priceHistories, crypto, cryptoPrices]);
+  }, [selectedBets, extendedPriceHistories, crypto, cryptoPrices]);
 
   // Get crypto price range for secondary Y axis
   const cryptoPriceRange = useMemo(() => {

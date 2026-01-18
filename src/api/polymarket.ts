@@ -59,19 +59,38 @@ export async function fetchPriceHistory(
 }
 
 export function parseMarkets(markets: PolymarketEvent['markets']): ParsedMarket[] {
-  return markets.map((market) => {
-    const tokenIds = JSON.parse(market.clobTokenIds) as string[];
-    return {
-      id: market.id,
-      question: market.question,
-      groupItemTitle: market.groupItemTitle,
-      groupItemThreshold: market.groupItemThreshold,
-      endDate: market.endDate,
-      startDate: market.startDate,
-      yesTokenId: tokenIds[0],
-      noTokenId: tokenIds[1],
-    };
-  });
+  return markets
+    .filter((market) => {
+      // Skip markets without valid clobTokenIds
+      if (!market.clobTokenIds) {
+        console.warn(`Market "${market.question}" has no clobTokenIds, skipping`);
+        return false;
+      }
+      try {
+        const tokenIds = JSON.parse(market.clobTokenIds);
+        if (!Array.isArray(tokenIds) || tokenIds.length < 2) {
+          console.warn(`Market "${market.question}" has invalid clobTokenIds format, skipping`);
+          return false;
+        }
+        return true;
+      } catch {
+        console.warn(`Market "${market.question}" has unparseable clobTokenIds: ${market.clobTokenIds}`);
+        return false;
+      }
+    })
+    .map((market) => {
+      const tokenIds = JSON.parse(market.clobTokenIds) as string[];
+      return {
+        id: market.id,
+        question: market.question,
+        groupItemTitle: market.groupItemTitle,
+        groupItemThreshold: market.groupItemThreshold,
+        endDate: market.endDate,
+        startDate: market.startDate,
+        yesTokenId: tokenIds[0],
+        noTokenId: tokenIds[1],
+      };
+    });
 }
 
 export function extractSlugFromUrl(url: string): string | null {
