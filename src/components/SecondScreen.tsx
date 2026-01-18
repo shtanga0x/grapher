@@ -312,10 +312,13 @@ export function SecondScreen({
         // Determine resolution value: 0 if resolved No, 1 if resolved Yes
         const resolutionPrice = lastPrice >= 0.5 ? 1 : 0;
 
-        // Create extended history with the resolution price at global max timestamp
+        // Add extension points to maintain the resolution price until global max
+        // We need TWO points: one right after resolution, one at the end
+        // This ensures findNearestPrice (with 270s max delta) always finds the resolution price
         const extendedHistory = [
           ...history,
-          { t: globalMaxTimestamp, p: resolutionPrice }
+          { t: lastTs + 1, p: resolutionPrice },  // Immediately after resolution
+          { t: globalMaxTimestamp, p: resolutionPrice }  // At the end
         ];
         extended.set(betKey, extendedHistory);
       } else {
